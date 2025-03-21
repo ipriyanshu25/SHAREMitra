@@ -194,7 +194,7 @@ import io
 image_analysis_bp = Blueprint("image_analysis", __name__)
 
 # Connect to MongoDB (same database as task_list.py)
-client = MongoClient("mongodb://localhost:27017")
+client = MongoClient("mongodb://localhost:27017") 
 db = client.task_manager
 tasks_collection = db.tasks
 
