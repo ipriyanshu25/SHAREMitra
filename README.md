@@ -65,5 +65,5 @@ Follow these steps to set up the project locally:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/sharemitra-flask-backend.git
-   cd sharemitra-flask-backend
+   git clone https://github.com/ipriyanshu25/SHAREMitra.git
+   cd SHAREMitra
