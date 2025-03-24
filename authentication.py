@@ -18,12 +18,12 @@ def login():
     
     # Retrieve the user by email.
     user = db.users.find_one({'email': email})
-    
-    # Check if user exists and verify the password.
+
     if user and bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
-        # Convert the primary _id and userId to strings.
-        user['userId'] = str(user['userId'])
-        user['userId'] = str(user.get('userId', user['userId']))
+        # Convert all ObjectId fields to strings
+        user['_id'] = str(user['_id'])  # Just in case you return it later
+        user['userId'] = str(user.get('userId', ''))
+
         return jsonify({
             'status': 1,
             'msg': "User exists",
@@ -36,6 +36,7 @@ def login():
             'msg': "User not exists",
             'classs': "danger"
         })
+
 
 @auth_bp.route("/register", methods=['POST'])
 def register():

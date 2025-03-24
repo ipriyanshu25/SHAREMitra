@@ -200,3 +200,141 @@ def get_payment_details_by_user(user_id):
 
 
 
+# from flask import Flask, request, jsonify, Blueprint
+# from pymongo import MongoClient
+# from datetime import datetime
+# import re
+# import requests
+# from bson import ObjectId
+# import razorpay
+
+# payment_details_bp = Blueprint("payment", __name__)
+
+# # MongoDB setup
+# client = MongoClient("mongodb://localhost:27017")
+# db = client["enoylity"]
+
+# # Razorpay client setup
+# razorpay_client = razorpay.Client(auth=("YOUR_RAZORPAY_KEY_ID", "YOUR_RAZORPAY_KEY_SECRET"))
+
+# def validate_ifsc(ifsc_code: str):
+#     pattern = r'^[A-Za-z]{4}0[A-Za-z0-9]{6}$'
+#     if not re.match(pattern, ifsc_code):
+#         return False, "IFSC code does not match the expected format (e.g., SBIN0005943)."
+    
+#     try:
+#         response = requests.get(f"https://ifsc.razorpay.com/{ifsc_code}")
+#         if response.status_code == 200:
+#             data = response.json()
+#             return True, data
+#         else:
+#             return False, "IFSC code not found or invalid."
+#     except Exception as e:
+#         return False, f"Error while validating IFSC code: {str(e)}"
+
+# @payment_details_bp.route("/payment-details", methods=["POST"])
+# def payment_details():
+#     data = request.get_json()
+#     payment_method = data.get("paymentMethod")
+#     user_id = data.get("userId")
+
+#     if not payment_method or not user_id:
+#         return jsonify({"status": 0, "msg": "Payment method and User ID required"}), 400
+
+#     existing_payment = db.payment.find_one({
+#         "userId": user_id,
+#         "paymentMethod": 1 if payment_method == "bank" else 0
+#     })
+
+#     document = {"userId": user_id, "created_at": datetime.utcnow()}
+
+#     if payment_method == "bank":
+#         accountHolder = data.get("accountHolder")
+#         accountNumber = data.get("accountNumber")
+#         ifsc = data.get("ifsc")
+#         bankName = data.get("bankName")
+#         if not all([accountHolder, accountNumber, ifsc, bankName]):
+#             return jsonify({"status": 0, "msg": "Incomplete bank details"}), 400
+
+#         valid, bank_info = validate_ifsc(ifsc)
+#         if not valid:
+#             return jsonify({"status": 404, "msg": "Invalid IFSC code"}), 404
+
+#         document.update({
+#             "paymentMethod": 1,
+#             "accountHolder": accountHolder,
+#             "accountNumber": accountNumber,
+#             "ifsc": ifsc,
+#             "bankName": bankName,
+#             "ifscDetails": bank_info
+#         })
+
+#     elif payment_method == "upi":
+#         upiId = data.get("upiId")
+#         if not upiId:
+#             return jsonify({"status": 0, "msg": "UPI ID not provided"}), 400
+
+#         document.update({"paymentMethod": 0, "upiId": upiId})
+
+#     else:
+#         return jsonify({"status": 0, "msg": "Invalid payment method"}), 400
+
+#     if existing_payment:
+#         result = db.payment.update_one({"_id": existing_payment["_id"]}, {"$set": document})
+#         msg = "updated" if result.modified_count else "unchanged"
+#         return jsonify({"status": 200, "msg": f"Payment details {msg} successfully"})
+#     else:
+#         document["paymentId"] = str(ObjectId())
+#         result = db.payment.insert_one(document)
+#         if result.inserted_id:
+#             return jsonify({"status": 200, "msg": "Payment details saved successfully"})
+#         else:
+#             return jsonify({"status": 500, "msg": "Failed to save payment details"}), 500
+
+# @payment_details_bp.route("/payment-details/user/<user_id>", methods=["GET"])
+# def get_payment_details_by_user(user_id):
+#     payments = list(db.payment.find({"userId": user_id}))
+#     if not payments:
+#         return jsonify({"status": 404, "msg": "No payment details found for this user"}), 404
+
+#     for payment in payments:
+#         payment["_id"] = str(payment["_id"])
+#         payment["created_at"] = payment["created_at"].isoformat()
+
+#     return jsonify({"status": 200, "msg": "Payment details retrieved successfully", "payments": payments}), 200
+
+# @payment_details_bp.route("/process-payment", methods=["POST"])
+# def process_payment():
+#     data = request.get_json()
+#     user_id = data.get("userId")
+#     amount = data.get("amount")  # Amount in INR
+
+#     if not all([user_id, amount]):
+#         return jsonify({"status": 0, "msg": "User ID and amount are required"}), 400
+
+#     payment_details = db.payment.find_one({"userId": user_id})
+#     if not payment_details:
+#         return jsonify({"status": 404, "msg": "Payment details not found for user"}), 404
+
+#     payout_data = {
+#         "account_number": "YOUR_RAZORPAY_ACCOUNT_NUMBER",
+#         "amount": amount * 100,
+#         "currency": "INR",
+#         "mode": "UPI" if payment_details["paymentMethod"] == 0 else "IMPS",
+#         "purpose": "payout",
+#         "fund_account": {
+#             "account_type": "vpa" if payment_details["paymentMethod"] == 0 else "bank_account",
+#             "vpa": {"address": payment_details["upiId"]} if payment_details["paymentMethod"] == 0 else None,
+#             "bank_account": {
+#                 "name": payment_details.get("accountHolder"),
+#                 "ifsc": payment_details.get("ifsc"),
+#                 "account_number": payment_details.get("accountNumber")
+#             } if payment_details["paymentMethod"] == 1 else None
+#         }
+#     }
+
+#     try:
+#         payout = razorpay_client.payout.create(payout_data)
+#         return jsonify({"status": 200, "msg": "Payment processed successfully", "payout": payout}), 200
+#     except Exception as e:
+#         return jsonify({"status": 500, "msg": f"Payment processing failed: {str(e)}"}), 500

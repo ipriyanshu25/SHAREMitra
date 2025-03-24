@@ -5,6 +5,7 @@ from task_list import task_list_bp
 # from image_analysis import image_analysis_bp  
 from payment_details import payment_details_bp
 from user import user_bp
+from admin import admin_bp
 
 
 
@@ -17,6 +18,8 @@ app.register_blueprint(task_list_bp, url_prefix="/task")
 # app.register_blueprint(image_analysis_bp, url_prefix="/image")
 app.register_blueprint(payment_details_bp, url_prefix="/payment")
 app.register_blueprint(user_bp, url_prefix="/user")
+app.register_blueprint(admin_bp,url_prefix = "/admin")
+
 
 if __name__ == '__main__':
     app.run(debug=True)
