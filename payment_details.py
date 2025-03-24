@@ -146,7 +146,7 @@ def payment_details():
             "accountNumber": accountNumber,
             "ifsc": ifsc,
             "bankName": bankName,
-            "ifscDetails": bank_info,  # Store the complete bank details returned by the API
+            "ifscDetails": bank_info,  
             "created_at": datetime.utcnow()
         }
 
@@ -159,7 +159,7 @@ def payment_details():
         document = {
             "userId": user_id,
             "paymentId": payment_id,
-            "paymentMethod": 0,  # 0 indicates UPI details
+            "paymentMethod": 0,  
             "upiId": upiId,
             "created_at": datetime.utcnow()
         }
@@ -318,7 +318,7 @@ def get_payment_details_by_user(user_id):
 
 #     payout_data = {
 #         "account_number": "YOUR_RAZORPAY_ACCOUNT_NUMBER",
-#         "amount": amount * 100,
+#         "amount": 25,
 #         "currency": "INR",
 #         "mode": "UPI" if payment_details["paymentMethod"] == 0 else "IMPS",
 #         "purpose": "payout",

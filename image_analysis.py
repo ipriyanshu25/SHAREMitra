@@ -314,7 +314,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # OpenAI API key (Replace with a new, valid key)
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "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"
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 # Ensure upload directory exists

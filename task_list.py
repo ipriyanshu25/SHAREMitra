@@ -6,11 +6,9 @@ import re
 
 task_list_bp = Blueprint("task", __name__)
 
-# Connect to MongoDB
 client = MongoClient("mongodb://localhost:27017")
 db = client['enoylity']
 
-# Regex for valid URL
 URL_REGEX = re.compile(
     r'^(https?:\/\/)?'  # http:// or https://
     r'(([A-Za-z0-9-]+\.)+[A-Za-z]{2,})'  # domain
