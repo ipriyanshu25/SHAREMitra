@@ -1,14 +1,14 @@
-from flask import Blueprint, request, jsonify
+from flask import Flask, request, jsonify, Blueprint
 from pymongo import MongoClient
 import bcrypt
 import re
+from bson import ObjectId
 
-# Define a blueprint for authentication routes.
 auth_bp = Blueprint('authentication', __name__)
 
 # Connect to MongoDB.
 client = MongoClient("mongodb://localhost:27017")
-db = client["enolity"]
+db = client["enoylity"]
 
 @auth_bp.route("/login", methods=['POST'])
 def login():
@@ -17,10 +17,13 @@ def login():
     password = input_data['password']
     
     # Retrieve the user by email.
-    user = db.useres.find_one({'email': email})
+    user = db.users.find_one({'email': email})
     
     # Check if user exists and verify the password.
     if user and bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
+        # Convert the primary _id and userId to strings.
+        user['userId'] = str(user['userId'])
+        user['userId'] = str(user.get('userId', user['userId']))
         return jsonify({
             'status': 1,
             'msg': "User exists",
@@ -67,7 +70,7 @@ def register():
         })
 
     # Check if the email is already registered.
-    existing_user = db.useres.find_one({'email': email})
+    existing_user = db.users.find_one({'email': email})
     if existing_user:
         return jsonify({
             'status': 0,
@@ -76,7 +79,7 @@ def register():
         })
 
     # Limit registrations per phone number to 3.
-    email_count = db.useres.count_documents({'phonenumber': phonenumber})
+    email_count = db.users.count_documents({'phonenumber': phonenumber})
     if email_count >= 3:
         return jsonify({
             'status': 0,
@@ -86,18 +89,18 @@ def register():
 
     # Hash password.
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
-    # Assign a unique ID.
-    count = db.useres.count_documents({})
+    
+    # Generate a new ObjectId and convert it to string.
+    new_id = str(ObjectId())
     new_user = {
-        "_id": count + 1,
+        "userId": new_id,      # Store it as userId as well
         "fullName": name,
         "email": email,
         "phonenumber": phonenumber,
         "password": hashed_password.decode('utf-8')
     }
 
-    db.useres.insert_one(new_user)
+    db.users.insert_one(new_user)
     
     return jsonify({
         'status': 1,

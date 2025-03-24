@@ -59,6 +59,27 @@ def update_details():
 
     return jsonify({"status": 200, "msg": "User details updated successfully."}), 200
 
+@user_bp.route("/get_id_by_email", methods=["GET"])
+def get_id_by_email():
+    """
+    Fetch the user's unique ID based on their email.
+    The email should be provided as a query parameter.
+    """
+    email = request.args.get("email")
+    if not email:
+        return jsonify({"status": 400, "msg": "Email parameter is required."}), 400
+
+    user = db.useres.find_one({"email": email})
+    if not user:
+        return jsonify({"status": 404, "msg": "User not found."}), 404
+    
+    return jsonify({
+        "status": 200,
+        "msg": "User ID retrieved successfully.",
+        "id": user.get("_id")
+    }), 200
+
+
 @user_bp.route("/update_password", methods=["POST"])
 def update_password():
     """

@@ -4,12 +4,11 @@ from datetime import datetime,timedelta
 from bson.objectid import ObjectId
 import re
 
-task_list_bp = Blueprint("task_list", __name__)
+task_list_bp = Blueprint("task", __name__)
 
 # Connect to MongoDB
 client = MongoClient("mongodb://localhost:27017")
-db = client.task_manager
-tasks_collection = db.tasks
+db = client['enoylity']
 
 # Regex for valid URL
 URL_REGEX = re.compile(
@@ -36,7 +35,7 @@ def display_message():
         "link" : task_link,
         "created_at":datetime.utcnow()
     }
-    result = tasks_collection.insert_one(new_task)
+    result = db.task.insert_one(new_task)
     if result.inserted_id:
         return jsonify({"status": 200, "msg": "Task message added succefylly"})
     else:
@@ -48,7 +47,7 @@ def display_message():
 @task_list_bp.route("/tasks", methods=['GET'])
 def get_tasks():
     """Retrieve tasks in reverse order (newest first) and mark new tasks (within last 72 hours)"""
-    tasks = list(tasks_collection.find().sort("created_at", -1))
+    tasks = list(db.task.find().sort("created_at", -1))
     
     # Calculate the threshold datetime (72 hours ago)
     now = datetime.utcnow()
