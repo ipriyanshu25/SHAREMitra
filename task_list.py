@@ -63,39 +63,17 @@ def get_tasks():
         for task in tasks
     ]
     
-    return jsonify({"status": 1, "tasks": task_list})
+    return jsonify({"status": 200, "tasks": task_list})
 
+@task_list_bp.route("/delete/<task_id>", methods=["DELETE"])
+def delete_task(task_id):
+    try:
+        result = db.task.delete_one({"_id": ObjectId(task_id)})
+        if result.deleted_count == 1:
+            return jsonify({"status": 200, "msg": "Task deleted successfully"}), 200
+        else:
+            return jsonify({"status": 404, "msg": "Task not found"}), 404
+    except Exception as e:
+        return jsonify({"status": 500, "msg": f"Error deleting task: {str(e)}"}), 500
 
-# @app.route("/admin/add-task", methods=['POST'])
-# def add_task():
-#     """Admin can add a new task as a link"""
-#     data = request.get_json()
-#     task_link = data.get("link")
-
-#     # Validate the task link
-#     if not task_link or not re.match(URL_REGEX, task_link):
-#         return jsonify({"status": 0, "msg": "Invalid URL format", "class": "error"})
-
-#     new_task = {
-#         "link": task_link,
-#         "created_at": datetime.utcnow()
-#     }
-
-#     # Insert into MongoDB
-#     result = tasks_collection.insert_one(new_task)
-
-#     if result.inserted_id:
-#         return jsonify({"status": 1, "msg": "Task added successfully", "class": "success"})
-#     else:
-#         return jsonify({"status": 0, "msg": "Failed to add task", "class": "error"})
-
-# @app.route("/tasks/<task_id>", methods=['DELETE'])
-# def delete_task(task_id):
-#     """Admin can delete a task by ID"""
-#     result = tasks_collection.delete_one({"_id": ObjectId(task_id)})
-    
-#     if result.deleted_count == 0:
-#         return jsonify({"status": 0, "msg": "Task not found", "class": "error"})
-
-#     return jsonify({"status": 1, "msg": "Task deleted successfully", "class": "success"})
 

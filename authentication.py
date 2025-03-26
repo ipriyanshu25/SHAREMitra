@@ -27,14 +27,12 @@ def login():
         return jsonify({
             'status': 1,
             'msg': "User exists",
-            'classs': "success",
             'user': user
         })
     else:
         return jsonify({
             'status': 0,
             'msg': "User not exists",
-            'classs': "danger"
         })
 
 
@@ -106,5 +104,4 @@ def register():
     return jsonify({
         'status': 1,
         'msg': "User registered successfully",
-        'class': "success"
     })
