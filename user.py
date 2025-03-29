@@ -1,307 +1,288 @@
-# from flask import Blueprint, request, jsonify
-# from pymongo import MongoClient
-# import bcrypt
-# import re
-# from bson import ObjectId
-
-# user_bp = Blueprint('user', __name__)
-
-# # Connect to MongoDB
-# client = MongoClient("mongodb://localhost:27017")
-# db = client["enolity"]
-
-# @user_bp.route("/profile", methods=["GET"])
-# def get_profile():
-#     """
-#     Fetch the logged-in user's details using their userId.
-#     The userId should be provided as a query parameter named "user_id".
-#     """
-#     user_id = request.args.get("user_id")
-#     if not user_id:
-#         return jsonify({"status": 0, "msg": "User ID is required to fetch profile details.", "class": "error"}), 400
-
-#     user = db.users.find_one({"userId": user_id})
-#     if not user:
-#         return jsonify({"status": 0, "msg": "User not found.", "class": "error"}), 404
-
-#     user.pop("password", None)
-#     user["_id"] = str(user["_id"])
-#     return jsonify({"status": 1, "msg": "User details fetched successfully.", "class": "success", "user": user})
-
-
-
-# @user_bp.route("/update_details", methods=["POST"])
-# def update_details():
-#     """
-#     Update user details based on the user's unique ID.
-#     The request must include the "_id" field.
-#     All fields (including email) can be updated except the "_id".
-#     """
-#     input_data = request.get_json()
-#     if not input_data or "_id" not in input_data:
-#         return jsonify({"status": 0, "msg": "User ID is required to update details.", "class": "error"}), 400
-
-#     user_id_str = input_data["_id"]
-#     try:
-#         user_id = ObjectId(user_id_str)
-#     except Exception:
-#         return jsonify({"status": 0, "msg": "Invalid user ID.", "class": "error"}), 400
-
-#     update_data = input_data.copy()
-#     update_data.pop("_id", None)  # Prevent updating the unique ID
-
-#     if "phonenumber" in update_data:
-#         phonenumber = update_data["phonenumber"]
-#         if not re.fullmatch(r"\d{10}", phonenumber):
-#             return jsonify({"status": 400, "msg": "Phone number must be exactly 10 digits."}), 400
-
-#     result = db.users.update_one({"_id": user_id}, {"$set": update_data})
-#     if result.matched_count == 0:
-#         return jsonify({"status": 404, "msg": "User not found."}), 404
-
-#     return jsonify({"status": 200, "msg": "User details updated successfully."}), 200
-
-
-# @user_bp.route("/get_id_by_email", methods=["GET"])
-# def get_id_by_email():
-#     """
-#     Fetch the user's unique ID based on their email.
-#     The email should be provided as a query parameter.
-#     """
-#     email = request.args.get("email")
-#     if not email:
-#         return jsonify({"status": 400, "msg": "Email parameter is required."}), 400
-
-#     user = db.users.find_one({"email": email})
-#     if not user:
-#         return jsonify({"status": 404, "msg": "User not found."}), 404
-
-#     return jsonify({
-#         "status": 200,
-#         "msg": "User ID retrieved successfully.",
-#         "id": str(user.get("_id"))
-#     }), 200
-
-
-# @user_bp.route("/update_password", methods=["POST"])
-# def update_password():
-#     """
-#     Update the user's password.
-#     Requires:
-#       - _id (unique identifier)
-#       - old_password (to verify identity)
-#       - new_password (which will be validated and hashed)
-#     """
-#     input_data = request.get_json()
-#     if not input_data or not all(k in input_data for k in ("_id", "old_password", "new_password")):
-#         return jsonify({"status": 0, "msg": "User ID, old_password, and new_password are required.", "class": "error"}), 400
-
-#     user_id_str = input_data["_id"]
-#     try:
-#         user_id = ObjectId(user_id_str)
-#     except Exception:
-#         return jsonify({"status": 0, "msg": "Invalid user ID.", "class": "error"}), 400
-
-#     old_password = input_data["old_password"]
-#     new_password = input_data["new_password"]
-
-#     if not re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$", new_password):
-#         return jsonify({
-#             "status": 400,
-#             "msg": "Password must be 8-16 characters long, include uppercase, lowercase, a number, and a special character.",
-#         }), 400
-
-#     if "gmail" in new_password.lower():
-#         return jsonify({
-#             "status": 400,
-#             "msg": "Password should not contain 'gmail'.",
-#         }), 400
-
-#     user = db.users.find_one({"_id": user_id})
-#     if not user:
-#         return jsonify({"status": 404, "msg": "User not found."}), 404
-
-#     if not bcrypt.checkpw(old_password.encode('utf-8'), user['password'].encode('utf-8')):
-#         return jsonify({"status": 400, "msg": "Old password is incorrect."}), 400
-
-#     hashed_new_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-#     db.users.update_one({"_id": user_id}, {"$set": {"password": hashed_new_password}})
-
-#     return jsonify({"status": 200, "msg": "Password updated successfully."})
-
-
-# # @user_bp.route("/getuser", methods=["GET"])
-# # def get_user():
-# #     """
-# #     Admin endpoint to search for a user by unique ID.
-# #     The user ID should be provided as a query parameter named "id".
-# #     """
-# #     user_id_str = request.args.get("id")
-# #     if not user_id_str:
-# #         return jsonify({"status": 0, "msg": "User ID query parameter is required."}), 400
-
-# #     try:
-# #         user_id = ObjectId(user_id_str)
-# #     except Exception:
-# #         return jsonify({"status": 400, "msg": "Invalid user ID."}), 400
-
-# #     user = db.users.find_one({"_id": user_id})
-# #     if not user:
-# #         return jsonify({"status": 400, "msg": "User not found."}), 404
-
-# #     user.pop("password", None)
-# #     user["_id"] = str(user["_id"])
-# #     return jsonify({"status": 200, "user": user})
-
-
-
-# @user_bp.route("/getuser", methods=["GET"])
-# def get_user():
-#     """
-#     Admin endpoint to search for a user using their email address.
-#     Query parameter: ?email=user@example.com
-#     """
-#     email = request.args.get("email")
-#     if not email:
-#         return jsonify({"status": 0, "msg": "Email query parameter is required."}), 400
-
-#     user = db.users.find_one({"email": email})
-#     if not user:
-#         return jsonify({"status": 404, "msg": "User not found."}), 404
-
-#     user.pop("password", None)
-#     user["_id"] = str(user["_id"])
-#     return jsonify({"status": 200, "user": user}), 200
-
-
-
-# @user_bp.route("/all", methods=["GET"])
-# def get_all_users():
-#     all_users_cursor = db.users.find({})
-#     all_users = []
-
-#     for usr in all_users_cursor:
-#         print("Fetched User:", usr)  # 👈 Log to terminal
-#         usr["_id"] = str(usr["_id"])
-#         usr.pop("password", None)
-#         all_users.append(usr)
-
-#     print("Total Users Fetched:", len(all_users))  # 👈 Log to terminal
-#     print("Users in this MongoDB:", list(db.users.find({})))
-#     return jsonify({"status": 200, "users": all_users}), 200
-
-
-
-
-
 from flask import Blueprint, request, jsonify
-from pymongo import MongoClient
+from flask_pymongo import PyMongo
+from bson.objectid import ObjectId
+from passlib.hash import bcrypt
+import uuid
+import random
+import string
+import datetime
 import re
-import bcrypt
-from bson import ObjectId
+from db import db  
 
-user_bp = Blueprint('user', __name__)
+user_bp = Blueprint("user", __name__, url_prefix="/user")
 
-# Connect to MongoDB
-client = MongoClient("mongodb://localhost:27017")
-db = client["enoylity"]
+def generate_referral_code(length=6):
+    """ Generate a unique referral code with uppercase letters & digits. """
+    chars = string.ascii_uppercase + string.digits
+    return ''.join(random.choices(chars, k=length))
 
-@user_bp.route("/profile", methods=["GET"])
-def get_profile():
-    user_id = request.args.get("user_id")
+def generate_short_id(prefix="usr"):
+    """ Generate a short ID, e.g. usr_ab12cd. """
+    suffix = uuid.uuid4().hex[:6]
+    return f"{prefix}_{suffix}"
+
+def is_valid_name(name: str) -> bool:
+    """ Check if name length <= 50. """
+    return len(name) <= 50
+
+def is_valid_email(email: str) -> bool:
+    """
+    Check basic length & pattern for email.
+    You can add more robust regex if desired.
+    """
+    if len(email) < 5 or len(email) > 100:
+        return False
+    pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    return bool(re.match(pattern, email))
+
+def is_valid_phone(phone: str) -> bool:
+    """ Check phone is exactly 10 digits. """
+    pattern = r"^[0-9]{10}$"
+    return bool(re.match(pattern, phone))
+
+def is_valid_password(password: str) -> bool:
+    """
+    Check password constraints:
+    - 8 to 16 chars
+    - at least one uppercase, one lowercase, one digit, and one special char
+    """
+    pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,16}$'
+    return bool(re.match(pattern, password))
+
+@user_bp.route("/register", methods=["POST"])
+def register():
+    """
+    Registers a new user with:
+      - name (max 50 chars)
+      - email (unique, 5-100 chars)
+      - phone (unique, 10 digits)
+      - password (8–16 chars, must include uppercase, lowercase, digit, special char)
+    
+    Body JSON example:
+    {
+      "name": "John Doe",
+      "email": "john@example.com",
+      "phone": "1234567890",
+      "password": "Abc@1234"
+    }
+    """
+    data = request.json or {}
+    name = data.get("name", "")
+    email = data.get("email", "")
+    phone = data.get("phone", "")
+    password = data.get("password", "")
+
+    if not name or not is_valid_name(name):
+        return jsonify({"error": "Invalid name (max 50 chars)."}), 400
+    if not is_valid_email(email):
+        return jsonify({"error": "Invalid email format or length (5-100 chars)."}), 400
+    if not is_valid_phone(phone):
+        return jsonify({"error": "Phone must be exactly 10 digits."}), 400
+    if not is_valid_password(password):
+        return jsonify({
+            "error": "Password must be 8-16 chars with uppercase, lowercase, digit, and special char."
+        }), 400
+
+    existing_user = db.users.find_one({
+        "$or": [{"email": email}, {"phone": phone}]
+    })
+    if existing_user:
+        if existing_user["email"] == email:
+            return jsonify({"error": "Email already registered."}), 400
+        else:
+            return jsonify({"error": "Phone number already registered."}), 400
+
+    user_id_str = str(ObjectId())  
+
+    referral_code = generate_referral_code(6)
+    while db.users.find_one({"referralCode": referral_code}):
+        referral_code = generate_referral_code(6)
+
+    password_hash = bcrypt.hash(password)
+
+    user_doc = {
+        "userId": user_id_str,         
+        "referralCode": referral_code,
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "passwordHash": password_hash,
+        "createdAt": datetime.datetime.utcnow(),
+        "updatedAt": datetime.datetime.utcnow()
+    }
+
+    db.users.insert_one(user_doc)
+
+    return jsonify({
+        "message": "User registered successfully",
+        "userId": user_id_str,
+        "referralCode": referral_code
+    }), 201
+
+@user_bp.route("/login", methods=["POST"])
+def login():
+    data = request.json or {}
+    email = data.get("email", "")
+    phone = data.get("phone", "")
+    password = data.get("password", "")
+
+    if not password:
+        return jsonify({"error": "Password is required"}), 400
+    if not email and not phone:
+        return jsonify({"error": "Either email or phone is required"}), 400
+
+    query = {"email": email} if email else {"phone": phone}
+
+    user_doc = db.users.find_one(query, {"_id": 0, "passwordHash": 0})
+    if not user_doc:
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    stored_hash = db.users.find_one(query, {"passwordHash": 1})
+    if not stored_hash:
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    if not bcrypt.verify(password, stored_hash["passwordHash"]):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+  
+    return jsonify({
+        "message": "Login successful",
+        "user": user_doc
+    }), 200
+
+
+@user_bp.route("/getlist", methods=["GET"])
+def get_user_list():
+    """
+    Returns a list of all users (excluding passwordHash).
+    """
+    users_cursor = db.users.find({}, {
+        "_id": 0, 
+        "passwordHash": 0
+    })
+    users_list = list(users_cursor)
+    return jsonify(users_list), 200
+
+@user_bp.route("/getbyid", methods=["GET"])
+def get_user_by_id():
+    """
+    GET /user/getbyid?userId=<someId>
+    Example: /user/getbyid?userId=usr_abc123
+    """
+    user_id = request.args.get("userId")
     if not user_id:
-        return jsonify({"status": 0, "msg": "User ID is required.", "class": "error"}), 400
+        return jsonify({"error": "userId query parameter is required"}), 400
 
-    user = db.users.find_one({"userId": user_id})
-    if not user:
-        return jsonify({"status": 0, "msg": "User not found.", "class": "error"}), 404
+    user_doc = db.users.find_one({"userId": user_id}, {
+        "_id": 0,
+        "passwordHash": 0
+    })
+    if not user_doc:
+        return jsonify({"error": "User not found"}), 404
 
-    user.pop("password", None)
-    user["_id"] = str(user["_id"])
-    return jsonify({"status": 1, "msg": "User profile fetched.", "class": "success", "user": user})
+    return jsonify(user_doc), 200
 
+@user_bp.route("/delete", methods=["POST"])
+def delete_user():
+    data = request.json or {}
+    user_id = data.get("userId")
 
-@user_bp.route("/update_details", methods=["POST"])
-def update_details():
-    input_data = request.get_json()
-    user_id = input_data.get("user_id")
     if not user_id:
-        return jsonify({"status": 0, "msg": "User ID is required.", "class": "error"}), 400
+        return jsonify({"error": "userId is required in the body"}), 400
 
-    update_data = input_data.copy()
-    update_data.pop("user_id", None)
+    result = db.users.delete_one({"userId": user_id})
+    if result.deleted_count == 0:
+        return jsonify({"error": "User not found"}), 404
 
-    if "phonenumber" in update_data:
-        if not re.fullmatch(r"\d{10}", update_data["phonenumber"]):
-            return jsonify({"status": 0, "msg": "Phone number must be exactly 10 digits.", "class": "error"}), 400
+    return jsonify({"message": "User deleted successfully"}), 200
 
-    result = db.users.update_one({"userId": user_id}, {"$set": update_data})
+
+@user_bp.route("/updatedetails", methods=["POST"])
+def update_user_details():
+    data = request.json or {}
+    user_id = data.get("userId")
+
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    update_fields = {}
+    if "name" in data:
+        if not is_valid_name(data["name"]):
+            return jsonify({"error": "Invalid name (max 50 chars)."}), 400
+        update_fields["name"] = data["name"]
+
+    if "email" in data:
+        if not is_valid_email(data["email"]):
+            return jsonify({"error": "Invalid email or length exceeded."}), 400
+        
+        existing_email = db.users.find_one(
+            {"email": data["email"], "userId": {"$ne": user_id}}
+        )
+        if existing_email:
+            return jsonify({"error": "Email is already used by another account."}), 400
+        
+        update_fields["email"] = data["email"]
+
+    if "phone" in data:
+        if not is_valid_phone(data["phone"]):
+            return jsonify({"error": "Phone must be exactly 10 digits."}), 400
+        
+        existing_phone = db.users.find_one(
+            {"phone": data["phone"], "userId": {"$ne": user_id}}
+        )
+        if existing_phone:
+            return jsonify({"error": "Phone number is already used by another account."}), 400
+        
+        update_fields["phone"] = data["phone"]
+
+    if not update_fields:
+        return jsonify({"error": "No valid fields to update."}), 400
+
+    update_fields["updatedAt"] = datetime.datetime.utcnow()
+
+    result = db.users.update_one(
+        {"userId": user_id},
+        {"$set": update_fields}
+    )
     if result.matched_count == 0:
-        return jsonify({"status": 0, "msg": "User not found.", "class": "error"}), 404
+        return jsonify({"error": "User not found."}), 404
 
-    return jsonify({"status": 1, "msg": "User details updated successfully.", "class": "success"})
+    return jsonify({"message": "User details updated."}), 200
 
-
-@user_bp.route("/get_id_by_email", methods=["GET"])
-def get_id_by_email():
-    email = request.args.get("email")
-    if not email:
-        return jsonify({"status": 0, "msg": "Email is required.", "class": "error"}), 400
-
-    user = db.users.find_one({"email": email})
-    if not user:
-        return jsonify({"status": 0, "msg": "User not found.", "class": "error"}), 404
-
-    return jsonify({"status": 1, "msg": "User ID fetched.", "id": user["userId"]})
-
-
-@user_bp.route("/update_password", methods=["POST"])
+@user_bp.route("/updatepassword", methods=["POST"])
 def update_password():
-    input_data = request.get_json()
-    user_id = input_data.get("user_id")
-    old_password = input_data.get("old_password")
-    new_password = input_data.get("new_password")
+    
+    data = request.json or {}
+    user_id = data.get("userId")
+    old_password = data.get("oldPassword", "")
+    new_password = data.get("newPassword", "")
 
-    if not all([user_id, old_password, new_password]):
-        return jsonify({"status": 0, "msg": "All fields are required.", "class": "error"}), 400
+    if not user_id or not old_password or not new_password:
+        return jsonify({"error": "userId, oldPassword, and newPassword are required"}), 400
 
-    if not re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$", new_password):
-        return jsonify({"status": 0, "msg": "Password must be 8-16 characters with upper, lower, number and special character.", "class": "error"}), 400
+    if not is_valid_password(new_password):
+        return jsonify({
+            "error": (
+                "Password must be 8-16 chars, include uppercase, lowercase, "
+                "digit, and special character."
+            )
+        }), 400
 
-    if "gmail" in new_password.lower():
-        return jsonify({"status": 0, "msg": "Password should not contain 'gmail'.", "class": "error"}), 400
+    user_doc = db.users.find_one({"userId": user_id})
+    if not user_doc:
+        return jsonify({"error": "User not found"}), 404
 
-    user = db.users.find_one({"userId": user_id})
-    if not user or not bcrypt.checkpw(old_password.encode('utf-8'), user['password'].encode('utf-8')):
-        return jsonify({"status": 0, "msg": "Old password is incorrect.", "class": "error"}), 400
+    if not bcrypt.verify(old_password, user_doc["passwordHash"]):
+        return jsonify({"error": "Old password is incorrect"}), 401
 
-    hashed_new_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    db.users.update_one({"userId": user_id}, {"$set": {"password": hashed_new_password}})
-
-    return jsonify({"status": 1, "msg": "Password updated successfully.", "class": "success"})
-
-
-@user_bp.route("/getuser", methods=["GET"])
-def get_user_by_email():
-    email = request.args.get("email")
-    if not email:
-        return jsonify({"status": 0, "msg": "Email is required.", "class": "error"}), 400
-
-    user = db.users.find_one({"email": email})
-    if not user:
-        return jsonify({"status": 0, "msg": "User not found.", "class": "error"}), 404
-
-    user.pop("password", None)
-    user["_id"] = str(user["_id"])
-    return jsonify({"status": 1, "user": user})
-
-
-@user_bp.route("/all", methods=["GET"])
-def get_all_users():
-    users = []
-    for user in db.users.find({}):
-        user["_id"] = str(user["_id"])
-        user.pop("password", None)
-        users.append(user)
-
-    return jsonify({"status": 200, "users": users}),200
+    new_hash = bcrypt.hash(new_password)
+    db.users.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "passwordHash": new_hash,
+                "updatedAt": datetime.datetime.utcnow()
+            }
+        }
+    )
+    return jsonify({"message": "Password updated successfully"}), 200
