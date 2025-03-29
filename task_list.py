@@ -34,7 +34,7 @@ def create_task():
     data = request.json or {}
     title = data.get("title", "").strip()
     description = data.get("description", "").strip()
-    message = data.get("message", "").strip()
+    message = data.get("message", "").strip() 
 
     # Basic validation
     if not title:
@@ -144,11 +144,13 @@ def delete_task():
 def get_all_tasks():
     """
     GET /task/getall
-    Returns a list of all tasks (excluding Mongo _id).
+    Returns all tasks sorted by newest first (newest task on top).
+    Excludes Mongo _id field.
     """
-    tasks_cursor = db.tasks.find({}, {"_id": 0})
+    tasks_cursor = db.tasks.find({}, {"_id": 0}).sort("createdAt", -1)
     tasks_list = list(tasks_cursor)
     return jsonify(tasks_list), 200
+
 
 @task_bp.route("/getbyid", methods=["GET"])
 def get_task_by_id():
@@ -166,3 +168,45 @@ def get_task_by_id():
         return jsonify({"error": "Task not found"}), 404
 
     return jsonify(task_doc), 200
+
+
+
+
+
+@task_bp.route("/newtask", methods=["GET"])
+def get_new_task():
+    """
+    GET /task/newtask
+    Returns the most recently created task (top task).
+    """
+    latest_task = db.tasks.find({}, {"_id": 0}).sort("createdAt", -1).limit(1)
+    latest_task_list = list(latest_task)
+    
+    if not latest_task_list:
+        return jsonify({"error": "No tasks found"}), 404
+
+    return jsonify(latest_task_list[0]), 200
+
+
+@task_bp.route("/prevtasks", methods=["GET"])
+def get_previous_tasks():
+    """
+    GET /task/previoustasks
+    Returns all tasks except the most recent one.
+    """
+    # First, find the latest taskId
+    latest_task = db.tasks.find({}, {"taskId": 1}).sort("createdAt", -1).limit(1)
+    latest_task_list = list(latest_task)
+    
+    if not latest_task_list:
+        return jsonify([]), 200  # No tasks yet
+
+    latest_task_id = latest_task_list[0]["taskId"]
+
+    # Get all other tasks excluding the latest one
+    previous_tasks_cursor = db.tasks.find(
+        {"taskId": {"$ne": latest_task_id}}, {"_id": 0}
+    ).sort("createdAt", -1)
+
+    previous_tasks = list(previous_tasks_cursor)
+    return jsonify(previous_tasks), 200
