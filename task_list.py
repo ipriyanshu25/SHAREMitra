@@ -142,21 +142,16 @@ def delete_task():
 
 @task_bp.route("/getall", methods=["GET"])
 def get_all_tasks():
-    """
-    GET /task/getall
-    Returns all tasks sorted by newest first (newest task on top).
-    Excludes Mongo _id field.
-    """
     tasks_cursor = db.tasks.find({}, {"_id": 0}).sort("createdAt", -1)
     tasks_list = list(tasks_cursor)
-    return jsonify(tasks_list), 200
+    return jsonify({"tasks": tasks_list}), 200
+
 
 
 @task_bp.route("/getbyid", methods=["GET"])
 def get_task_by_id():
     """
     GET /task/getbyid?taskId=<someId>
-    
     Example: /task/getbyid?taskId=xxxxxxxxxxxxxxxxxxxxxxxx
     """
     task_id = request.args.get("taskId", "").strip()
@@ -167,10 +162,7 @@ def get_task_by_id():
     if not task_doc:
         return jsonify({"error": "Task not found"}), 404
 
-    return jsonify(task_doc), 200
-
-
-
+    return jsonify({"task": task_doc}), 200
 
 
 @task_bp.route("/newtask", methods=["GET"])
@@ -185,28 +177,26 @@ def get_new_task():
     if not latest_task_list:
         return jsonify({"error": "No tasks found"}), 404
 
-    return jsonify(latest_task_list[0]), 200
+    return jsonify({"new": latest_task_list[0]}), 200
 
 
 @task_bp.route("/prevtasks", methods=["GET"])
 def get_previous_tasks():
     """
-    GET /task/previoustasks
+    GET /task/prevtasks
     Returns all tasks except the most recent one.
     """
-    # First, find the latest taskId
     latest_task = db.tasks.find({}, {"taskId": 1}).sort("createdAt", -1).limit(1)
     latest_task_list = list(latest_task)
     
     if not latest_task_list:
-        return jsonify([]), 200  # No tasks yet
+        return jsonify({"previous": []}), 200  # No tasks yet
 
     latest_task_id = latest_task_list[0]["taskId"]
 
-    # Get all other tasks excluding the latest one
     previous_tasks_cursor = db.tasks.find(
         {"taskId": {"$ne": latest_task_id}}, {"_id": 0}
     ).sort("createdAt", -1)
 
     previous_tasks = list(previous_tasks_cursor)
-    return jsonify(previous_tasks), 200
+    return jsonify({"previous": previous_tasks}), 200
