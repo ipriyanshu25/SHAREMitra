@@ -16,7 +16,7 @@ def is_valid_url(url: str) -> bool:
     pattern = r'^(https?|ftp)://[^\s/$.?#].[^\s]*$'
     return bool(re.match(pattern, url))
 
-@task_bp.route("/createtask", methods=["POST"])
+@task_bp.route("/create", methods=["POST"])
 def create_task():
     """
     POST /task/createtask
@@ -62,7 +62,7 @@ def create_task():
         "taskId": task_id_str
     }), 201
 
-@task_bp.route("/updatetask", methods=["POST"])
+@task_bp.route("/update", methods=["POST"])
 def update_task():
     """
     POST /task/updatetask
