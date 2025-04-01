@@ -131,7 +131,7 @@ def check_group_participants(image_path):
 
         Return JSON with:
         - participant_count (integer)
-        - is_valid_group (boolean, true if participants >= 100)
+        - is_valid_group (boolean, true if participants >= 200)
         - group_name (string)
         - reason (brief explanation)
         """
@@ -264,7 +264,7 @@ def verify_image():
     if not group_check.get("is_valid_group"):
         return jsonify({
             "verified": False,
-            "message": "Add more participants (at least 100 required)",
+            "message": "Add more participants (at least 200 required)",
             "participant_check": group_check
         }), 200
 
