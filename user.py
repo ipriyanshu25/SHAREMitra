@@ -1,3 +1,122 @@
+# from flask import Blueprint, request, jsonify
+# from flask_pymongo import PyMongo
+# from bson.objectid import ObjectId
+# from passlib.hash import bcrypt
+# import uuid
+# import random
+# import string
+# import datetime
+# import re
+# from db import db  
+
+# user_bp = Blueprint("user", __name__, url_prefix="/user")
+
+# def generate_referral_code(length=6):
+#     """ Generate a unique referral code with uppercase letters & digits. """
+#     chars = string.ascii_uppercase + string.digits
+#     return ''.join(random.choices(chars, k=length))
+
+# def generate_short_id(prefix="usr"):
+#     """ Generate a short ID, e.g. usr_ab12cd. """
+#     suffix = uuid.uuid4().hex[:6]
+#     return f"{prefix}_{suffix}"
+
+# def is_valid_name(name: str) -> bool:
+#     """ Check if name length <= 50. """
+#     return len(name) <= 50
+
+# def is_valid_email(email: str) -> bool:
+#     """
+#     Check basic length & pattern for email.
+#     You can add more robust regex if desired.
+#     """
+#     if len(email) < 5 or len(email) > 100:
+#         return False
+#     pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+#     return bool(re.match(pattern, email))
+
+# def is_valid_phone(phone: str) -> bool:
+#     """ Check phone is exactly 10 digits. """
+#     pattern = r"^[0-9]{10}$"
+#     return bool(re.match(pattern, phone))
+
+# def is_valid_password(password: str) -> bool:
+#     """
+#     Check password constraints:
+#     - 8 to 16 chars
+#     - at least one uppercase, one lowercase, one digit, and one special char
+#     """
+#     pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,16}$'
+#     return bool(re.match(pattern, password))
+
+# @user_bp.route("/register", methods=["POST"])
+# def register():
+#     data = request.json or {}
+#     name = data.get("name", "")
+#     email = data.get("email", "")
+#     phone = data.get("phone", "")
+#     password = data.get("password", "")
+#     used_referral_code = data.get("referralCode")  # Optional
+
+#     if not name or not is_valid_name(name):
+#         return jsonify({"error": "Invalid name (max 50 chars)."}), 400
+#     if not is_valid_email(email):
+#         return jsonify({"error": "Invalid email format or length (5-100 chars)."}), 400
+#     if not is_valid_phone(phone):
+#         return jsonify({"error": "Phone must be exactly 10 digits."}), 400
+#     if not is_valid_password(password):
+#         return jsonify({
+#             "error": "Password must be 8-16 chars with uppercase, lowercase, digit, and special char."
+#         }), 400
+
+#     existing_user = db.users.find_one({
+#         "$or": [{"email": email}, {"phone": phone}]
+#     })
+#     if existing_user:
+#         if existing_user["email"] == email:
+#             return jsonify({"error": "Email already registered."}), 400
+#         else:
+#             return jsonify({"error": "Phone number already registered."}), 400
+
+#     user_id_str = str(ObjectId())  
+
+#     referral_code = generate_referral_code(6)
+#     while db.users.find_one({"referralCode": referral_code}):
+#         referral_code = generate_referral_code(6)
+
+#     password_hash = bcrypt.hash(password)
+
+#     referred_by = None
+#     if used_referral_code:
+#         referrer = db.users.find_one({"referralCode": used_referral_code})
+#         if not referrer:
+#             return jsonify({"error": "Invalid referral code."}), 400
+#         referred_by = used_referral_code
+#         db.users.update_one(
+#             {"referralCode": used_referral_code},
+#             {"$inc": {"referralCount": 1}}
+#         )
+
+#     user_doc = {
+#         "userId": user_id_str,
+#         "referralCode": referral_code,
+#         "referredBy": referred_by,           # NEW FIELD
+#         "referralCount": 0,                  # NEW FIELD
+#         "name": name,
+#         "email": email,
+#         "phone": phone,
+#         "passwordHash": password_hash,
+#         "createdAt": datetime.datetime.utcnow(),
+#         "updatedAt": datetime.datetime.utcnow()
+#     }
+
+#     db.users.insert_one(user_doc)
+
+#     return jsonify({
+#         "message": "User registered successfully",
+#         "userId": user_id_str,
+#     }), 201
+
 from flask import Blueprint, request, jsonify
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
@@ -7,70 +126,43 @@ import random
 import string
 import datetime
 import re
-from db import db  
+from db import db
 
 user_bp = Blueprint("user", __name__, url_prefix="/user")
 
 def generate_referral_code(length=6):
-    """ Generate a unique referral code with uppercase letters & digits. """
     chars = string.ascii_uppercase + string.digits
     return ''.join(random.choices(chars, k=length))
 
 def generate_short_id(prefix="usr"):
-    """ Generate a short ID, e.g. usr_ab12cd. """
     suffix = uuid.uuid4().hex[:6]
     return f"{prefix}_{suffix}"
 
 def is_valid_name(name: str) -> bool:
-    """ Check if name length <= 50. """
     return len(name) <= 50
 
 def is_valid_email(email: str) -> bool:
-    """
-    Check basic length & pattern for email.
-    You can add more robust regex if desired.
-    """
     if len(email) < 5 or len(email) > 100:
         return False
     pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     return bool(re.match(pattern, email))
 
 def is_valid_phone(phone: str) -> bool:
-    """ Check phone is exactly 10 digits. """
     pattern = r"^[0-9]{10}$"
     return bool(re.match(pattern, phone))
 
 def is_valid_password(password: str) -> bool:
-    """
-    Check password constraints:
-    - 8 to 16 chars
-    - at least one uppercase, one lowercase, one digit, and one special char
-    """
     pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,16}$'
     return bool(re.match(pattern, password))
 
 @user_bp.route("/register", methods=["POST"])
 def register():
-    """
-    Registers a new user with:
-      - name (max 50 chars)
-      - email (unique, 5-100 chars)
-      - phone (unique, 10 digits)
-      - password (8–16 chars, must include uppercase, lowercase, digit, special char)
-    
-    Body JSON example:
-    {
-      "name": "John Doe",
-      "email": "john@example.com",
-      "phone": "1234567890",
-      "password": "Abc@1234"
-    }
-    """
     data = request.json or {}
     name = data.get("name", "")
     email = data.get("email", "")
     phone = data.get("phone", "")
     password = data.get("password", "")
+    used_referral_code = data.get("referralCode")
 
     if not name or not is_valid_name(name):
         return jsonify({"error": "Invalid name (max 50 chars)."}), 400
@@ -79,20 +171,16 @@ def register():
     if not is_valid_phone(phone):
         return jsonify({"error": "Phone must be exactly 10 digits."}), 400
     if not is_valid_password(password):
-        return jsonify({
-            "error": "Password must be 8-16 chars with uppercase, lowercase, digit, and special char."
-        }), 400
+        return jsonify({"error": "Password must be 8-16 chars with uppercase, lowercase, digit, and special char."}), 400
 
-    existing_user = db.users.find_one({
-        "$or": [{"email": email}, {"phone": phone}]
-    })
+    existing_user = db.users.find_one({"$or": [{"email": email}, {"phone": phone}]})
     if existing_user:
         if existing_user["email"] == email:
             return jsonify({"error": "Email already registered."}), 400
         else:
             return jsonify({"error": "Phone number already registered."}), 400
 
-    user_id_str = str(ObjectId())  
+    user_id_str = str(ObjectId())
 
     referral_code = generate_referral_code(6)
     while db.users.find_one({"referralCode": referral_code}):
@@ -100,13 +188,25 @@ def register():
 
     password_hash = bcrypt.hash(password)
 
+    referred_by = None
+    if used_referral_code:
+        referrer = db.users.find_one({"referralCode": used_referral_code})
+        if not referrer:
+            return jsonify({"error": "Invalid referral code."}), 400
+        referred_by = used_referral_code
+        db.users.update_one({"referralCode": used_referral_code}, {"$inc": {"referralCount": 1}})
+
     user_doc = {
-        "userId": user_id_str,         
+        "userId": user_id_str,
         "referralCode": referral_code,
+        "referredBy": referred_by,
+        "referralCount": 0,
         "name": name,
         "email": email,
         "phone": phone,
         "passwordHash": password_hash,
+        "razorpay_contact_id": None,          # Placeholder for Razorpay Contact ID
+        "razorpay_fund_account_id": None,     # Placeholder for Razorpay Fund Account ID
         "createdAt": datetime.datetime.utcnow(),
         "updatedAt": datetime.datetime.utcnow()
     }
@@ -115,8 +215,7 @@ def register():
 
     return jsonify({
         "message": "User registered successfully",
-        "userId": user_id_str,
-        "referralCode": referral_code
+        "userId": user_id_str
     }), 201
 
 @user_bp.route("/login", methods=["POST"])
@@ -286,3 +385,25 @@ def update_password():
         }
     )
     return jsonify({"message": "Password updated successfully"}), 200
+
+
+
+@user_bp.route("/referrals", methods=["GET"])
+def get_referrals():
+    referral_code = request.args.get("referralCode")
+    if not referral_code:
+        return jsonify({"error": "referralCode query param required"}), 400
+
+    referrer = db.users.find_one({"referralCode": referral_code})
+    if not referrer:
+        return jsonify({"error": "Invalid referral code"}), 404
+
+    referred_users = list(db.users.find(
+        {"referredBy": referral_code},
+        {"_id": 0, "passwordHash": 0}
+    ))
+
+    return jsonify({
+        "referralCount": len(referred_users),
+        "referredUsers": referred_users
+    }), 200

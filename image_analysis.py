@@ -7,17 +7,20 @@ from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, Blueprint
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient
+from dotenv import load_dotenv
 
-image_analysis_bp = Blueprint('image_analysis', __name__)
+# Load environment variables
+load_dotenv()
 
-# Configuration
+# Configuration from .env
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_URL = os.getenv("OPENAI_API_URL")
+
+image_analysis_bp = Blueprint('image_analysis', __name__, url_prefix="/image")
+
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# OpenAI API key (replace this with a valid key in production)
-OPENAI_API_KEY = "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"
-OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 # MongoDB connection
 client = MongoClient("mongodb://localhost:27017")
@@ -84,7 +87,6 @@ def analyze_image_with_openai(image_path, expected_link):
         if response.status_code == 200:
             result = response.json()
             assistant_content = result["choices"][0]["message"]["content"]
-
             assistant_content_clean = re.sub(r"```(?:json)?", "", assistant_content).replace("```", "").strip()
 
             try:
@@ -299,5 +301,3 @@ def verify_image():
         "group_check": group_check,
         "message_group_info": message_group_info
     }), 200
-
-

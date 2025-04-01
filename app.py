@@ -7,6 +7,7 @@ from payment_details import payment_details_bp
 from user import user_bp
 from admin import admin_bp
 from dashboard import dashboard_bp
+from payout import payout_bp
 
 
 
@@ -19,6 +20,7 @@ app.register_blueprint(task_bp)
 app.register_blueprint(image_analysis_bp, url_prefix="/image")
 app.register_blueprint(payment_details_bp)
 app.register_blueprint(user_bp)
+app.register_blueprint(payout_bp)
 app.register_blueprint(admin_bp,url_prefix = "/admin")
 app.register_blueprint(dashboard_bp,url_prefix = "/dashboard")
 
