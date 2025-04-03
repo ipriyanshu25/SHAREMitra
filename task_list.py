@@ -140,12 +140,80 @@ def delete_task():
 
     return jsonify({"message": "Task deleted successfully"}), 200
 
-@task_bp.route("/getall", methods=["GET"])
+@task_bp.route("/getall", methods=["POST"])
 def get_all_tasks():
-    tasks_cursor = db.tasks.find({}, {"_id": 0}).sort("createdAt", -1)
-    tasks_list = list(tasks_cursor)
-    return jsonify({"tasks": tasks_list}), 200
+    """
+    POST /task/getall
+    Request JSON Body:
+      {
+        "userId": "user123",
+        "keyword": "optional search keyword",
+        "page": 0,             # optional, default=0
+        "per_page": 50         # optional, default=50
+      }
+    Returns:
+      {
+        "total": <total_matching_tasks>,
+        "page": <current_page>,
+        "per_page": <items_per_page>,
+        "tasks": [
+            {
+              "taskId": "xxxxxxxxxxxxxxxxxxxxxxxx",
+              "title": "Some Title",
+              "description": "Task description",
+              "message": "https://example.com/valid-link",
+              "status": "pending/accepted",  # defaults to pending if not updated
+              "createdAt": "...",
+              "updatedAt": "..."
+            },
+            ...
+        ]
+      }
+    """
+    data = request.get_json() or {}
+    
+    # Validate required userId
+    user_id = data.get("userId", "").strip()
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
 
+    # Retrieve optional keyword and pagination parameters
+    keyword = data.get("keyword", "").strip()
+    try:
+        page = int(data.get("page", 0))
+    except ValueError:
+        return jsonify({"error": "page must be an integer"}), 400
+
+    try:
+        per_page = int(data.get("per_page", 50))
+    except ValueError:
+        return jsonify({"error": "per_page must be an integer"}), 400
+
+    # Build query to filter tasks for this user
+    query = {"userId": user_id}
+    if keyword:
+        query["$or"] = [
+            {"title": {"$regex": keyword, "$options": "i"}},
+            {"description": {"$regex": keyword, "$options": "i"}},
+            {"message": {"$regex": keyword, "$options": "i"}},
+            {"status": {"$regex": keyword, "$options": "i"}}
+        ]
+
+    total_items = db.tasks.count_documents(query)
+    tasks_cursor = db.tasks.find(query, {"_id": 0}).sort("createdAt", -1)\
+        .skip(page * per_page).limit(per_page)
+    tasks_list = list(tasks_cursor)
+
+    # Ensure each task shows a status, defaulting to "pending" if not set.
+    for task in tasks_list:
+        task["status"] = task.get("status", "pending")
+
+    return jsonify({
+        "total": total_items,
+        "page": page,
+        "per_page": per_page,
+        "tasks": tasks_list
+    }), 200
 
 
 @task_bp.route("/getbyid", methods=["GET"])
@@ -177,8 +245,7 @@ def get_new_task():
     if not latest_task_list:
         return jsonify({"error": "No tasks found"}), 404
 
-    return jsonify({"new": latest_task_list[0]}), 200
-
+    return jsonify({"task": latest_task_list[0]}), 200
 
 @task_bp.route("/prevtasks", methods=["GET"])
 def get_previous_tasks():
@@ -190,7 +257,7 @@ def get_previous_tasks():
     latest_task_list = list(latest_task)
     
     if not latest_task_list:
-        return jsonify({"previous": []}), 200  # No tasks yet
+        return jsonify({"tasks": []}), 200  # No tasks yet
 
     latest_task_id = latest_task_list[0]["taskId"]
 
@@ -199,4 +266,47 @@ def get_previous_tasks():
     ).sort("createdAt", -1)
 
     previous_tasks = list(previous_tasks_cursor)
-    return jsonify({"previous": previous_tasks}), 200
+    return jsonify({"tasks": previous_tasks}), 200
+
+@task_bp.route('/history', methods=['POST'])
+def get_task_history():
+    """
+    POST /image/api/history
+    Request JSON Body:
+      {
+        "userId": "user123"
+      }
+    Returns:
+      {
+         "userId": "user123",
+         "task_history": [
+             {
+                "taskId": "xxxxxxxxxxxxxxxxxxxxxxxx",
+                "userId": "user123",
+                "matched_link": "https://example.com/valid-link",
+                "group_name": "Group Name",
+                "participant_count": 2,
+                "details": { ... },
+                "verified": true,
+                "verifiedAt": "2025-04-02T15:00:00"
+             },
+             ...
+         ]
+      }
+    """
+    data = request.get_json() or {}
+    user_id = data.get("userId", "").strip()
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    # Query the task_history collection for documents matching the given userId.
+    tasks_cursor = db.task_history.find({"userId": user_id}, {"_id": 0}).sort("verifiedAt", -1)
+    tasks_list = list(tasks_cursor)
+
+    return jsonify({
+        "userId": user_id,
+        "task_history": tasks_list
+    }), 200
+
+
+

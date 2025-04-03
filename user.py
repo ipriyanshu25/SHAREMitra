@@ -7,7 +7,7 @@ import random
 import string
 import datetime
 import re
-from db import db
+from db import db  # Ensure this imports your configured PyMongo instance
 
 user_bp = Blueprint("user", __name__, url_prefix="/user")
 
@@ -86,8 +86,9 @@ def register():
         "email": email,
         "phone": phone,
         "passwordHash": password_hash,
-        "razorpay_contact_id": None,          # Placeholder for Razorpay Contact ID
-        "razorpay_fund_account_id": None,     # Placeholder for Razorpay Fund Account ID
+        "razorpay_contact_id": None,
+        "razorpay_fund_account_id": None,
+        "totalPayoutAmount": 0,   # Initialize total payout amount to 0
         "createdAt": datetime.datetime.utcnow(),
         "updatedAt": datetime.datetime.utcnow()
     }
@@ -124,27 +125,13 @@ def login():
     if not bcrypt.verify(password, stored_hash["passwordHash"]):
         return jsonify({"error": "Invalid credentials"}), 401
 
-  
     return jsonify({
         "message": "Login successful",
         "user": user_doc
     }), 200
 
-
 @user_bp.route("/getlist", methods=["POST"])
 def get_user_list():
-    """
-    Returns a paginated list of users (excluding passwordHash) and supports keyword search.
-    Request JSON Body:
-      - keyword: (optional) search keyword for name, email, or phone.
-      - page: (optional, default=0) page number (0-indexed).
-      - per_page: (optional, default=50) number of items per page.
-    Response:
-      - total: total number of matching users.
-      - page: current page number.
-      - per_page: number of users per page.
-      - users: list of user documents (excluding sensitive fields).
-    """
     data = request.get_json() or {}
     keyword = data.get("keyword", "")
     try:
@@ -156,7 +143,6 @@ def get_user_list():
     except ValueError:
         return jsonify({"error": "per_page must be an integer."}), 400
 
-    # Build query: if keyword provided, search in name, email, or phone (case-insensitive)
     query = {}
     if keyword:
         query = {
@@ -178,13 +164,8 @@ def get_user_list():
         "users": users_list
     }), 200
 
-
 @user_bp.route("/getbyid", methods=["GET"])
 def get_user_by_id():
-    """
-    GET /user/getbyid?userId=<someId>
-    Example: /user/getbyid?userId=usr_abc123
-    """
     user_id = request.args.get("userId")
     if not user_id:
         return jsonify({"error": "userId query parameter is required"}), 400
@@ -202,7 +183,6 @@ def get_user_by_id():
 def delete_user():
     data = request.json or {}
     user_id = data.get("userId")
-
     if not user_id:
         return jsonify({"error": "userId is required in the body"}), 400
 
@@ -212,12 +192,10 @@ def delete_user():
 
     return jsonify({"message": "User deleted successfully"}), 200
 
-
 @user_bp.route("/updatedetails", methods=["POST"])
 def update_user_details():
     data = request.json or {}
     user_id = data.get("userId")
-
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
@@ -230,25 +208,21 @@ def update_user_details():
     if "email" in data:
         if not is_valid_email(data["email"]):
             return jsonify({"error": "Invalid email or length exceeded."}), 400
-        
         existing_email = db.users.find_one(
             {"email": data["email"], "userId": {"$ne": user_id}}
         )
         if existing_email:
             return jsonify({"error": "Email is already used by another account."}), 400
-        
         update_fields["email"] = data["email"]
 
     if "phone" in data:
         if not is_valid_phone(data["phone"]):
             return jsonify({"error": "Phone must be exactly 10 digits."}), 400
-        
         existing_phone = db.users.find_one(
             {"phone": data["phone"], "userId": {"$ne": user_id}}
         )
         if existing_phone:
             return jsonify({"error": "Phone number is already used by another account."}), 400
-        
         update_fields["phone"] = data["phone"]
 
     if not update_fields:
@@ -267,7 +241,6 @@ def update_user_details():
 
 @user_bp.route("/updatepassword", methods=["POST"])
 def update_password():
-    
     data = request.json or {}
     user_id = data.get("userId")
     old_password = data.get("oldPassword", "")
@@ -303,8 +276,6 @@ def update_password():
     )
     return jsonify({"message": "Password updated successfully"}), 200
 
-
-
 @user_bp.route("/referrals", methods=["GET"])
 def get_referrals():
     referral_code = request.args.get("referralCode")
@@ -324,3 +295,10 @@ def get_referrals():
         "referralCount": len(referred_users),
         "referredUsers": referred_users
     }), 200
+
+
+
+
+
+
+
