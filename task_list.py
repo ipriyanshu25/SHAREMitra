@@ -19,63 +19,82 @@ def is_valid_url(url: str) -> bool:
 @task_bp.route("/create", methods=["POST"])
 def create_task():
     """
-    POST /task/createtask
+    POST /task/create
     JSON Body:
     {
       "title": "Some Title",
       "description": "Task description",
-      "message": "https://example.com/valid-link"
+      "message": "https://example.com/valid-link",
+      "task_price": 100  # New numeric input
     }
     
     - 'title' (required, non-empty)
-    - 'message' must be a valid URL (per is_valid_url).
+    - 'message' must be a valid URL
     - 'description' optional
+    - 'task_price' required, positive number
     """
     data = request.json or {}
     title = data.get("title", "").strip()
     description = data.get("description", "").strip()
-    message = data.get("message", "").strip() 
+    message = data.get("message", "").strip()
+    task_price = data.get("task_price")
 
-    # Basic validation
+    # Validation
     if not title:
         return jsonify({"error": "title is required"}), 400
+
     if not message:
         return jsonify({"error": "message (link) is required"}), 400
+
     if not is_valid_url(message):
         return jsonify({"error": "message must be a valid link (URL)"}), 400
 
-    # Generate a unique taskId from MongoDB ObjectId
+    if task_price is None:
+        return jsonify({"error": "task_price is required"}), 400
+    try:
+        task_price = float(task_price)
+        if task_price <= 0:
+            raise ValueError()
+    except ValueError:
+        return jsonify({"error": "task_price must be a positive number"}), 400
+
+    # Generate unique taskId
     task_id_str = str(ObjectId())
 
     task_doc = {
         "taskId": task_id_str,
         "title": title,
         "description": description,
-        "message": message,  # validated URL
+        "message": message,
+        "task_price": task_price,  # New field added
         "createdAt": datetime.datetime.utcnow(),
         "updatedAt": datetime.datetime.utcnow()
     }
 
     db.tasks.insert_one(task_doc)
+
     return jsonify({
         "message": "Task created successfully",
         "taskId": task_id_str
     }), 201
 
+
 @task_bp.route("/update", methods=["POST"])
 def update_task():
     """
-    POST /task/updatetask
+    POST /task/update
     JSON Body:
     {
       "taskId": "xxxxxxxxxxxxxxxxxxxxxxxx",
       "title": "New Title",
       "description": "New Description",
-      "message": "https://example.com/new-valid-link"
+      "message": "https://example.com/new-valid-link",
+      "task_price": 120.50  # Optional numeric input
     }
     
     - 'taskId' is required to find the existing task.
     - If 'message' is provided, it must be a valid URL.
+    - If 'task_price' is provided, it must be a positive number.
     """
     data = request.json or {}
     task_id = data.get("taskId", "").strip()
@@ -83,6 +102,7 @@ def update_task():
         return jsonify({"error": "taskId is required"}), 400
 
     update_fields = {}
+
     # Title
     if "title" in data:
         title = data["title"].strip()
@@ -90,7 +110,7 @@ def update_task():
             update_fields["title"] = title
         else:
             return jsonify({"error": "title cannot be empty"}), 400
-    
+
     # Description
     if "description" in data:
         update_fields["description"] = data["description"].strip()
@@ -104,6 +124,17 @@ def update_task():
             return jsonify({"error": "message must be a valid link (URL)"}), 400
         update_fields["message"] = new_message
 
+    # Task Price
+    if "task_price" in data:
+        task_price = data["task_price"]
+        try:
+            task_price = float(task_price)
+            if task_price <= 0:
+                raise ValueError()
+            update_fields["task_price"] = task_price
+        except ValueError:
+            return jsonify({"error": "task_price must be a positive number"}), 400
+
     if not update_fields:
         return jsonify({"error": "No valid fields to update"}), 400
 
@@ -113,10 +144,12 @@ def update_task():
         {"taskId": task_id},
         {"$set": update_fields}
     )
+
     if result.matched_count == 0:
         return jsonify({"error": "Task not found"}), 404
 
     return jsonify({"message": "Task updated successfully"}), 200
+
 
 @task_bp.route("/delete", methods=["POST"])
 def delete_task():
@@ -271,7 +304,7 @@ def get_previous_tasks():
 @task_bp.route('/history', methods=['POST'])
 def get_task_history():
     """
-    POST /image/api/history
+    POST /task/history
     Request JSON Body:
       {
         "userId": "user123"
@@ -286,9 +319,10 @@ def get_task_history():
                 "matched_link": "https://example.com/valid-link",
                 "group_name": "Group Name",
                 "participant_count": 2,
-                "details": { ... },
+                "verification_details": { ... },
                 "verified": true,
-                "verifiedAt": "2025-04-02T15:00:00"
+                "verifiedAt": "2025-04-04T08:22:06.465Z",
+                "tskamount": 100    # Task price fetched and converted to int
              },
              ...
          ]
@@ -299,14 +333,57 @@ def get_task_history():
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
-    # Query the task_history collection for documents matching the given userId.
+    # Retrieve task history for the user
     tasks_cursor = db.task_history.find({"userId": user_id}, {"_id": 0}).sort("verifiedAt", -1)
     tasks_list = list(tasks_cursor)
+
+    # For each history record, ensure we include the task_price (as tskamount)
+    for task in tasks_list:
+        if "tskamount" not in task:
+            # Query the original tasks collection using the taskId
+            original_task = db.tasks.find_one(
+                {"taskId": task.get("taskId")},
+                {"_id": 0, "task_price": 1}
+            )
+            if original_task and "task_price" in original_task:
+                try:
+                    # Convert to float then int in case it's stored as a float string
+                    task["tskamount"] = int(float(original_task["task_price"]))
+                except ValueError:
+                    task["tskamount"] = 0
+            else:
+                task["tskamount"] = 0
 
     return jsonify({
         "userId": user_id,
         "task_history": tasks_list
     }), 200
+
+
+
+
+# // Import the functions you need from the SDKs you need
+# import { initializeApp } from "firebase/app";
+# import { getAnalytics } from "firebase/analytics";
+# // TODO: Add SDKs for Firebase products that you want to use
+# // https://firebase.google.com/docs/web/setup#available-libraries
+
+# // Your web app's Firebase configuration
+# // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+# const firebaseConfig = {
+#   apiKey: "AIzaSyDe-3e7Ud5icbJ3sXVY9TvfSjAnF6FRSRM",
+#   authDomain: "sharemitra-e77f2.firebaseapp.com",
+#   projectId: "sharemitra-e77f2",
+#   storageBucket: "sharemitra-e77f2.firebasestorage.app",
+#   messagingSenderId: "270883859154",
+#   appId: "1:270883859154:web:8b2a875e4254f1e0515b0b",
+#   measurementId: "G-XTSCH2FF68"
+# };
+
+# // Initialize Firebase
+# const app = initializeApp(firebaseConfig);
+# const analytics = getAnalytics(app);
+
 
 
 

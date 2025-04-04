@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify, Blueprint
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient
 from dotenv import load_dotenv
-
+from wallet import update_wallet_after_task
 # Load environment variables
 load_dotenv()
 
@@ -202,6 +202,15 @@ def verify_image():
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
+    # Check if the user has already completed this task
+    existing_entry = db.task_history.find_one({"taskId": task_id, "userId": user_id})
+    if existing_entry:
+        return jsonify({
+            "error": "Already done task",
+            "message": "This user has already completed the task.",
+            "status": "already_done"
+        }), 200
+
     # Fetch the task document from the database
     task_doc = db.tasks.find_one({"taskId": task_id})
     if not task_doc:
@@ -264,7 +273,7 @@ def verify_image():
             }}
         )
 
-        # Save the verified task to task_history along with the userId
+        # Save the verified task to task_history along with the userId and task_price
         history_doc = {
             "taskId": task_id,
             "userId": user_id,
@@ -273,9 +282,13 @@ def verify_image():
             "participant_count": group_check.get("participant_count"),
             "verification_details": result.get("details", {}),
             "verified": True,
-            "verifiedAt": datetime.utcnow()
+            "verifiedAt": datetime.utcnow(),
+            "task_price": int(task_doc.get("task_price", 0))
         }
         db.task_history.insert_one(history_doc)
+        wallet_update = update_wallet_after_task(user_id, task_id, int(task_doc.get("task_price", 0)))
+        if "error" in wallet_update:
+            return jsonify(wallet_update), 400
 
         return jsonify({
             "verified": True,

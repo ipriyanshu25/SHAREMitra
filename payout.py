@@ -36,6 +36,13 @@ def withdraw_funds():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
+    # Check wallet balance before processing withdrawal
+    wallet = db.wallet.find_one({"userId": user_id})
+    if not wallet:
+        return jsonify({"error": "Wallet not found for user"}), 404
+    if wallet.get("balance", 0) < float(amount):
+        return jsonify({"error": "Insufficient wallet balance"}), 400
+
     if payment_type == 1:
         payment = db.payment.find_one({"userId": user_id, "paymentMethod": 1})
         fund_account_type = "bank_account"
@@ -46,7 +53,7 @@ def withdraw_funds():
         return jsonify({"error": "Invalid paymentType. Use 0 for UPI or 1 for Bank"}), 400
 
     if not payment:
-        return jsonify({"error": f"No payment method found for selected type."}), 400
+        return jsonify({"error": "No payment method found for selected type."}), 400
 
     # Step 1: Create Contact if missing
     contact_id = user.get("razorpay_contact_id")
@@ -126,7 +133,7 @@ def withdraw_funds():
     payout_payload = {
         "account_number": RAZORPAYX_ACCOUNT_NO,
         "fund_account_id": fund_account_id,
-        "amount": int(amount) * 100,
+        "amount": int(amount) * 100,  # converting rupees to paise
         "currency": "INR",
         "mode": "IMPS" if fund_account_type == "bank_account" else "UPI",
         "purpose": "payout",
@@ -138,7 +145,7 @@ def withdraw_funds():
     try:
         payout = razorpay_post("payouts", payout_payload)
 
-        # ✅ Save to DB
+        # Save payout to DB
         db.payouts.insert_one({
             "userId": user_id,
             "payout_id": payout["id"],
@@ -150,6 +157,16 @@ def withdraw_funds():
             "created_at": datetime.datetime.utcnow()
         })
 
+        # Update wallet: subtract withdrawn amount and add to withdrawn field
+        db.wallet.update_one(
+            {"userId": user_id},
+            {
+                "$inc": {"balance": -float(amount), "withdrawn": float(amount)},
+                "$set": {"updatedAt": datetime.datetime.utcnow()}
+            }
+        )
+        updated_wallet = db.wallet.find_one({"userId": user_id}, {"_id": 0})
+
         return jsonify({
             "status": "success",
             "payout_id": payout["id"],
@@ -159,7 +176,8 @@ def withdraw_funds():
                 "fund_account_id": fund_account_id,
                 "fund_account_type": fund_account_type,
                 "fund_account_status": fund_account_status
-            }
+            },
+            "remaining_wallet_balance": updated_wallet.get("balance", 0)
         }), 200
 
     except requests.HTTPError as e:
@@ -227,3 +245,11 @@ def get_all_payouts_status():
     }), 200
 
 
+
+
+
+
+
+
+
+# VAf7d57b94f712c55fa3f4badbf2459e47    Verify Service SID

@@ -1,11 +1,10 @@
 from flask import Blueprint, request, jsonify
-from flask_pymongo import PyMongo
+import datetime
 from bson.objectid import ObjectId
 from passlib.hash import bcrypt
 import uuid
 import random
 import string
-import datetime
 import re
 from db import db  # Ensure this imports your configured PyMongo instance
 
@@ -43,6 +42,9 @@ def register():
     email = data.get("email", "")
     phone = data.get("phone", "")
     password = data.get("password", "")
+    state = data.get("state", "")
+    city = data.get("city", "")
+    dob = data.get("dob", "")  # Expecting YYYY-MM-DD format
     used_referral_code = data.get("referralCode")
 
     if not name or not is_valid_name(name):
@@ -53,6 +55,12 @@ def register():
         return jsonify({"error": "Phone must be exactly 10 digits."}), 400
     if not is_valid_password(password):
         return jsonify({"error": "Password must be 8-16 chars with uppercase, lowercase, digit, and special char."}), 400
+    if not state or not city:
+        return jsonify({"error": "State and city are required."}), 400
+    try:
+        dob_parsed = datetime.datetime.strptime(dob, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        return jsonify({"error": "Invalid date of birth format (YYYY-MM-DD required)."}), 400
 
     existing_user = db.users.find_one({"$or": [{"email": email}, {"phone": phone}]})
     if existing_user:
@@ -85,15 +93,30 @@ def register():
         "name": name,
         "email": email,
         "phone": phone,
+        "state": state,
+        "city": city,
+        "dob": dob_parsed,
         "passwordHash": password_hash,
         "razorpay_contact_id": None,
         "razorpay_fund_account_id": None,
-        "totalPayoutAmount": 0,   # Initialize total payout amount to 0
+        "totalPayoutAmount": 0,
         "createdAt": datetime.datetime.utcnow(),
         "updatedAt": datetime.datetime.utcnow()
     }
 
     db.users.insert_one(user_doc)
+    
+    # Immediately create a wallet for the user with initial total money 0
+    wallet_doc = {
+         "userId": user_id_str,
+         "total_earning": 0,
+         "withdrawn": 0,
+         "balance": 0,
+         "tasks": [],
+         "createdAt": datetime.datetime.utcnow(),
+         "updatedAt": datetime.datetime.utcnow()
+    }
+    db.wallet.insert_one(wallet_doc)
 
     return jsonify({
         "message": "User registered successfully",
@@ -103,32 +126,40 @@ def register():
 @user_bp.route("/login", methods=["POST"])
 def login():
     data = request.json or {}
-    email = data.get("email", "")
-    phone = data.get("phone", "")
+    identifier = data.get("identifier", "")  # User provides either email or phone
     password = data.get("password", "")
 
     if not password:
         return jsonify({"error": "Password is required"}), 400
-    if not email and not phone:
-        return jsonify({"error": "Either email or phone is required"}), 400
+    if not identifier:
+        return jsonify({"error": "Email or phone is required"}), 400
 
-    query = {"email": email} if email else {"phone": phone}
+    query = {}
+    if re.match(r"^[0-9]{10}$", identifier):
+        query["phone"] = identifier
+    elif re.match(r"^[\w\.-]+@[\w\.-]+\.\w+$", identifier):
+        query["email"] = identifier
+    else:
+        return jsonify({"error": "Invalid email or phone format."}), 400
 
-    user_doc = db.users.find_one(query, {"_id": 0, "passwordHash": 0})
+    user_doc = db.users.find_one(query, {"passwordHash": 1, "_id": 0})
     if not user_doc:
         return jsonify({"error": "Invalid credentials"}), 401
 
-    stored_hash = db.users.find_one(query, {"passwordHash": 1})
-    if not stored_hash:
+    if not bcrypt.verify(password, user_doc["passwordHash"]):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    if not bcrypt.verify(password, stored_hash["passwordHash"]):
-        return jsonify({"error": "Invalid credentials"}), 401
+    # Ensure that a wallet exists for the user. If not, return an error.
+    wallet = db.wallet.find_one({"userId": user_doc["userId"]})
+    if not wallet:
+        return jsonify({"error": "Invalid user. Wallet not found."}), 400
 
+    user_data = db.users.find_one(query, {"passwordHash": 0, "_id": 0})
     return jsonify({
         "message": "Login successful",
-        "user": user_doc
+        "user": user_data
     }), 200
+
 
 @user_bp.route("/getlist", methods=["POST"])
 def get_user_list():
