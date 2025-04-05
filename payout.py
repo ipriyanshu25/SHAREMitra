@@ -247,9 +247,78 @@ def get_all_payouts_status():
 
 
 
+@payout_bp.route("/getall", methods=["POST"])
+def get_all_payouts():
+    """
+    POST /payout/getall
+    Request JSON Body:
+    {
+        "keyword": "optional search keyword",
+        "page": 0,            # optional, default=0
+        "per_page": 50        # optional, default=50
+    }
+    
+    Returns a paginated list of payouts with the following fields:
+      - total: total number of matching payouts
+      - page: current page number
+      - per_page: items per page
+      - payouts: list of payouts with mapped status and user name
+    """
+    data = request.get_json() or {}
+    keyword = data.get("keyword", "").strip()
+    try:
+        page = int(data.get("page", 0))
+    except ValueError:
+        return jsonify({"error": "page must be an integer"}), 400
 
+    try:
+        per_page = int(data.get("per_page", 50))
+    except ValueError:
+        return jsonify({"error": "per_page must be an integer"}), 400
 
+    # Build query based on keyword. Searching across multiple payout fields.
+    query = {}
+    if keyword:
+        query["$or"] = [
+            {"userId": {"$regex": keyword, "$options": "i"}},
+            {"payout_id": {"$regex": keyword, "$options": "i"}},
+            {"status_detail": {"$regex": keyword, "$options": "i"}},
+            {"fund_account_type": {"$regex": keyword, "$options": "i"}}
+        ]
 
+    total_items = db.payouts.count_documents(query)
+    payouts_cursor = db.payouts.find(query, {"_id": 0}).sort("created_at", -1)\
+        .skip(page * per_page).limit(per_page)
+    payouts = list(payouts_cursor)
 
+    # Map status to user-friendly terms.
+    def map_status(status_raw):
+        if not status_raw:
+            return ""
+        status_raw = status_raw.lower()
+        if status_raw in ["processing"]:
+            return "Processing"
+        elif status_raw in ["failed", "rejected", "cancelled"]:
+            return "Declined"
+        elif status_raw in ["queued", "pending", "on-hold", "scheduled"]:
+            return "Pending"
+        elif status_raw in ["processed"]:
+            return "Processed"
+        else:
+            return status_raw.capitalize()
 
-# VAf7d57b94f712c55fa3f4badbf2459e47    Verify Service SID
+    # Enrich each payout with mapped status and user name.
+    for payout in payouts:
+        payout["status"] = map_status(payout.get("status_detail", ""))
+        # Amount is stored in rupees after conversion.
+        payout["amount"] = payout.get("amount", 0)
+        # Fetch user name from the users collection
+        user = db.users.find_one({"userId": payout.get("userId")}, {"_id": 0, "name": 1})
+        payout["userName"] = user.get("name") if user else "Unknown"
+
+    return jsonify({
+        "total": total_items,
+        "page": page,
+        "per_page": per_page,
+        "payouts": payouts
+    }), 200
